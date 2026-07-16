@@ -1,0 +1,6 @@
+{
+  "name": "Two Men One Naira",
+  "description": "An elegant book sales and registration platform for the book 'Two Men One Naira', featuring a professional landing page, high-fidelity Bachs.io payment gateway integration, and registration tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
