@@ -85,20 +85,7 @@ export const handler = async (event) => {
   const text = await res.text();
   if (!res.ok) {
     console.error("Bachs checkout error:", res.status, text);
-    // TEMP DEBUG: surface Bachs' error AND what Bachs thinks the product costs.
-    let product = null;
-    try {
-      const p = await fetch(`${base}/v1/products/${process.env.BACHS_PRODUCT_ID}`, {
-        headers: { Authorization: `Bearer ${process.env.BACHS_SECRET_KEY}` },
-      });
-      product = { status: p.status, body: (await p.text()).slice(0, 900) };
-    } catch (e) {
-      product = { fetchError: String(e) };
-    }
-    return json(502, {
-      error: "Failed to create the checkout session.",
-      debug: { status: res.status, body: text.slice(0, 400), product },
-    });
+    return json(502, { error: "Failed to create the checkout session." });
   }
 
   let session;
