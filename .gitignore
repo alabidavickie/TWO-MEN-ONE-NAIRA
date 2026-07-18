@@ -6,3 +6,12 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Local tooling / editor config
+.claude/
+
+# Never commit secrets
+*firebase-adminsdk*.json
+*serviceAccount*.json
+*service-account*.json
+*_base64.txt

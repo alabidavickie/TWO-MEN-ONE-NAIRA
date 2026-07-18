@@ -1,0 +1,36 @@
+# Netlify config for Two Men One Naira.
+# Frontend = static Vite build (dist/). Backend = Netlify Functions (Bachs
+# checkout + webhook), which talk to Firestore via the Firebase Admin SDK.
+
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+[functions]
+  node_bundler = "esbuild"
+  # firebase-admin has dynamic requires that don't bundle cleanly; let Netlify
+  # install it at runtime instead of bundling it.
+  external_node_modules = ["firebase-admin"]
+
+# Pretty API paths → functions. Must come BEFORE the SPA catch-all below.
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# SPA fallback: every other route serves index.html so ?checkout_id and #admin
+# resolve client-side.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Long-cache the hashed, immutable build assets.
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"

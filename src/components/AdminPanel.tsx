@@ -1,27 +1,86 @@
 import React, { useEffect, useState } from "react";
 import { collection, query, orderBy, getDocs, deleteDoc, doc } from "firebase/firestore";
-import { db } from "../firebase";
-import { Registration } from "../types";
-import { 
-  Users, 
-  Search, 
-  TrendingUp, 
-  Calendar, 
-  Smartphone, 
-  Mail, 
-  Trash2, 
-  Loader2, 
+import {
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+  type User as FirebaseUser
+} from "firebase/auth";
+import { db, auth } from "../firebase";
+import { Registration, PaymentStatus } from "../types";
+import {
+  Users,
+  Search,
+  TrendingUp,
+  Calendar,
+  Smartphone,
+  Mail,
+  Trash2,
+  Loader2,
   DollarSign,
   Download,
   ShieldCheck,
-  RefreshCw
+  RefreshCw,
+  Lock,
+  LogOut,
+  AlertCircle
 } from "lucide-react";
+
+function StatusBadge({ status }: { status: PaymentStatus }) {
+  const styles: Record<PaymentStatus, string> = {
+    success: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+    pending: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+    failed: "bg-red-500/10 text-red-400 border-red-500/20",
+    underpaid: "bg-orange-500/10 text-orange-400 border-orange-500/20",
+  };
+  return (
+    <span className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-medium border uppercase ${styles[status] || styles.pending}`}>
+      {status}
+    </span>
+  );
+}
 
 export default function AdminPanel() {
   const [registrations, setRegistrations] = useState<Registration[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+
+  // --- Admin auth gate ---
+  const [authUser, setAuthUser] = useState<FirebaseUser | null>(null);
+  const [authChecked, setAuthChecked] = useState<boolean>(false);
+  const [loginEmail, setLoginEmail] = useState<string>("");
+  const [loginPassword, setLoginPassword] = useState<string>("");
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState<boolean>(false);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setAuthUser(user);
+      setAuthChecked(true);
+    });
+    return () => unsub();
+  }, []);
+
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError(null);
+    setIsLoggingIn(true);
+    try {
+      await signInWithEmailAndPassword(auth, loginEmail.trim(), loginPassword);
+      setLoginPassword("");
+    } catch (err: any) {
+      setLoginError("Invalid credentials or unauthorized account.");
+      console.warn("Admin login failed:", err?.code || err);
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await signOut(auth);
+    setRegistrations([]);
+  };
 
   const fetchRegistrations = async () => {
     setIsRefreshing(true);
@@ -42,8 +101,13 @@ export default function AdminPanel() {
   };
 
   useEffect(() => {
-    fetchRegistrations();
-  }, []);
+    if (authUser) {
+      fetchRegistrations();
+    } else {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authUser]);
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Are you sure you want to remove this registration record?")) return;
@@ -58,15 +122,17 @@ export default function AdminPanel() {
   const handleExportCSV = () => {
     if (registrations.length === 0) return;
     
-    const headers = ["ID", "Full Name", "Email", "Phone", "Quantity", "Amount (NGN)", "Ref", "Method", "Date"];
+    const headers = ["ID", "Full Name", "Email", "Phone", "Quantity", "Amount", "Currency", "Status", "Ref", "Method", "Date"];
     const rows = registrations.map((r) => [
       r.id || "",
       `"${r.fullName.replace(/"/g, '""')}"`,
       r.email,
       r.phone,
       r.quantity || 1,
-      r.amount,
-      r.paymentReference,
+      r.amount ?? "",
+      r.currency ?? "",
+      r.paymentStatus,
+      r.reference ?? "",
       r.paymentMethod,
       r.createdAt
     ]);
@@ -89,15 +155,112 @@ export default function AdminPanel() {
       r.fullName.toLowerCase().includes(term) ||
       r.email.toLowerCase().includes(term) ||
       r.phone.toLowerCase().includes(term) ||
-      r.paymentReference.toLowerCase().includes(term)
+      (r.reference || "").toLowerCase().includes(term)
     );
   });
 
-  const totalRevenue = registrations.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  // Only confirmed (paid) registrations count toward revenue.
+  const paid = registrations.filter((r) => r.paymentStatus === "success");
+  const totalRevenue = paid.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+  const revenueCurrency = paid.find((r) => r.currency)?.currency || "";
+
+  // Wait until Firebase resolves the current session before deciding what to show
+  if (!authChecked) {
+    return (
+      <div className="py-24 flex flex-col items-center justify-center gap-3">
+        <Loader2 className="w-8 h-8 text-teal-400 animate-spin" />
+        <span className="text-xs text-stone-400 font-mono">Checking admin session...</span>
+      </div>
+    );
+  }
+
+  // GATE: no authenticated admin → show login only, never the ledger
+  if (!authUser) {
+    return (
+      <div className="w-full max-w-md mx-auto">
+        <div className="bg-stone-900 border border-stone-800 rounded-2xl overflow-hidden shadow-2xl">
+          <div className="bg-gradient-to-r from-teal-950/40 via-stone-900 to-stone-900 px-6 py-5 border-b border-stone-800 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-teal-500/10 border border-teal-500/30 flex items-center justify-center shrink-0 text-teal-400">
+              <Lock className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[10px] bg-teal-500/10 text-teal-400 px-2 py-0.5 rounded font-mono font-bold tracking-wider border border-teal-500/20 uppercase">
+                Restricted
+              </span>
+              <h3 className="text-stone-100 font-serif font-semibold text-lg mt-0.5">
+                Merchant Dashboard Login
+              </h3>
+            </div>
+          </div>
+
+          <form onSubmit={handleLogin} className="p-6 md:p-8 space-y-5">
+            <p className="text-xs text-stone-400 leading-relaxed">
+              Sign in with your authorized admin account to view the sales ledger. Buyer records are protected and not publicly accessible.
+            </p>
+
+            {loginError && (
+              <div className="p-3.5 bg-red-950/20 border border-red-500/30 rounded-xl text-xs text-red-400 flex items-start gap-2.5">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{loginError}</span>
+              </div>
+            )}
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase font-mono tracking-wider text-stone-400 block">Admin Email</label>
+              <div className="relative">
+                <input
+                  required
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="admin@example.com"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-11 pr-4 py-3.5 text-stone-200 text-sm focus:outline-none focus:ring-1 focus:ring-teal-500 placeholder-stone-600 font-sans"
+                />
+                <Mail className="absolute left-4 top-4 w-4 h-4 text-stone-500" />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-[10px] uppercase font-mono tracking-wider text-stone-400 block">Password</label>
+              <div className="relative">
+                <input
+                  required
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-stone-950 border border-stone-800 rounded-xl pl-11 pr-4 py-3.5 text-stone-200 text-sm focus:outline-none focus:ring-1 focus:ring-teal-500 placeholder-stone-600 font-mono"
+                />
+                <Lock className="absolute left-4 top-4 w-4 h-4 text-stone-500" />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoggingIn}
+              className="w-full bg-teal-500 hover:bg-teal-400 disabled:bg-stone-800 disabled:text-stone-600 text-black font-semibold py-3.5 rounded-xl transition-all shadow-lg flex items-center justify-center gap-2 cursor-pointer"
+            >
+              {isLoggingIn ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Signing in...</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck className="w-4 h-4" />
+                  <span>Access Sales Ledger</span>
+                </>
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full max-w-6xl mx-auto space-y-6">
-      
+
       {/* Header section with Stats */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -130,6 +293,16 @@ export default function AdminPanel() {
             <Download className="w-3.5 h-3.5" />
             Export CSV
           </button>
+
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="p-2.5 bg-stone-900 border border-stone-800 rounded-xl text-stone-400 hover:text-red-400 hover:bg-red-500/5 transition-all flex items-center gap-1.5 text-xs font-mono"
+            title={authUser?.email ? `Signed in as ${authUser.email}` : "Sign out"}
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            Sign Out
+          </button>
         </div>
       </div>
 
@@ -153,9 +326,9 @@ export default function AdminPanel() {
             <DollarSign className="w-6 h-6" />
           </div>
           <div>
-            <span className="text-[10px] text-stone-400 uppercase tracking-wider font-mono block">Gross Revenue</span>
+            <span className="text-[10px] text-stone-400 uppercase tracking-wider font-mono block">Gross Revenue (paid)</span>
             <span className="text-2xl font-bold text-emerald-400 font-mono mt-0.5 block">
-              {loading ? "..." : `₦${totalRevenue.toLocaleString()}`}
+              {loading ? "..." : `${revenueCurrency ? revenueCurrency + " " : ""}${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
             </span>
           </div>
         </div>
@@ -240,12 +413,15 @@ export default function AdminPanel() {
                     </td>
                     <td className="p-4">
                       <div className="font-semibold text-stone-200 font-mono text-xs">
-                        ₦{item.amount.toLocaleString()}
+                        {item.amount != null
+                          ? `${item.currency ? item.currency + " " : ""}${item.amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                          : <span className="text-stone-500">—</span>}
                       </div>
                       <div className="text-[10px] text-stone-400 font-mono mt-0.5">
                         {item.quantity || 1} { (item.quantity || 1) === 1 ? "copy" : "copies" }
                       </div>
-                      <div className="mt-1.5">
+                      <div className="mt-1.5 flex items-center gap-1.5">
+                        <StatusBadge status={item.paymentStatus} />
                         <span className="text-[9px] bg-stone-950 text-teal-400 px-1.5 py-0.5 rounded font-mono font-medium border border-stone-800">
                           {item.paymentMethod}
                         </span>
@@ -253,7 +429,7 @@ export default function AdminPanel() {
                     </td>
                     <td className="p-4">
                       <span className="font-mono text-xs text-stone-400 bg-stone-950 px-2.5 py-1 rounded select-all border border-stone-800">
-                        {item.paymentReference}
+                        {item.reference || "—"}
                       </span>
                     </td>
                     <td className="p-4 text-right">

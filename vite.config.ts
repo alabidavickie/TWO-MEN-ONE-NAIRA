@@ -11,6 +11,13 @@ export default defineConfig(() => {
         '@': path.resolve(__dirname, '.'),
       },
     },
+    // Pre-bundle all Firebase entry points together so firebase/app,
+    // firebase/firestore, and firebase/auth share a single dependency
+    // instance. Without this they can be optimized in separate passes,
+    // causing "Component auth has not been registered yet".
+    optimizeDeps: {
+      include: ['firebase/app', 'firebase/firestore', 'firebase/auth'],
+    },
     server: {
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.
