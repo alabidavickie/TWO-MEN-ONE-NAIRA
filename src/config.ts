@@ -3,7 +3,7 @@
 // IMPORTANT: the amount actually charged is whatever the Bachs *product* is
 // priced at (that is the source of truth). Keep this in sync with the product
 // price you set in the Bachs dashboard so the UI doesn't mislead buyers.
-export const PRICE_PER_COPY = 15; // e.g. 15.00
+export const PRICE_PER_COPY = 1500; // $1,500.00 per copy — must match the Bachs product price
 export const PRICE_CURRENCY = "USD";
 export const MAX_COPIES = 10;
 
