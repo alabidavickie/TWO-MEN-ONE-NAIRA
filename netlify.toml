@@ -9,6 +9,11 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  # These env vars are non-secret identifiers/URLs that legitimately appear in
+  # code and docs, so exclude them from Netlify's secret scanner. The real
+  # secrets (BACHS_SECRET_KEY, BACHS_WEBHOOK_SECRET, FIREBASE_SERVICE_ACCOUNT_B64)
+  # are NOT listed here and remain scanned.
+  SECRETS_SCAN_OMIT_KEYS = "BACHS_BASE_URL,APP_BASE_URL,BACHS_PRODUCT_ID"
 
 [functions]
   node_bundler = "esbuild"
