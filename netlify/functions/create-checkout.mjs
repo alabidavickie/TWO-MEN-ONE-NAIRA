@@ -3,7 +3,7 @@ import { getDb } from "./utils/firebase.mjs";
 import { json } from "./utils/verify.mjs";
 
 const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const MAX_QUANTITY = 3; // max copies per order (backend guard). Keep in sync with MAX_COPIES in src/config.ts
+const MAX_QUANTITY = 2; // max copies per order (backend guard). Keep in sync with MAX_COPIES in src/config.ts
 
 // POST /api/create-checkout
 // Body: { fullName, email, phone, quantity }
