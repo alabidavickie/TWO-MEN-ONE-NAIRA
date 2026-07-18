@@ -5,7 +5,7 @@
 // price you set in the Bachs dashboard so the UI doesn't mislead buyers.
 export const PRICE_PER_COPY = 1500; // $1,500.00 per copy — must match the Bachs product price
 export const PRICE_CURRENCY = "USD";
-export const MAX_COPIES = 10;
+export const MAX_COPIES = 3; // max copies per order (UI). Keep in sync with MAX_QUANTITY in netlify/functions/create-checkout.mjs
 
 // Base URL for the /api functions. Empty = same origin (the deployed Netlify
 // site serves both the app and its functions). For local dev against a deployed
