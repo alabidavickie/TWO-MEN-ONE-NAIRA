@@ -9,7 +9,7 @@
     "preview": "vite preview",
     "clean": "rm -rf dist server.js",
     "lint": "tsc --noEmit",
-    "test:webhook": "node netlify/functions/test-signature.mjs",
+    "test:webhook": "node tests/webhook-signature.test.mjs",
     "deploy:rules": "firebase deploy --only firestore:rules"
   },
   "dependencies": {

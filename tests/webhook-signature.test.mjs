@@ -2,7 +2,7 @@
 // Run: `npm run test:webhook` (no Firebase / no network needed).
 import crypto from "node:crypto";
 import assert from "node:assert";
-import { verifyBachsSignature } from "./utils/verify.mjs";
+import { verifyBachsSignature } from "../netlify/functions/utils/verify.mjs";
 
 function sign(secret, timestamp, rawBody) {
   return crypto.createHmac("sha256", secret).update(`${timestamp}.${rawBody}`).digest("hex");
