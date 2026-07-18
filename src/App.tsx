@@ -31,20 +31,43 @@ export default function App() {
   const estimatedTotal = PRICE_PER_COPY * quantity;
 
   // Route on load + hash/nav changes:
-  //  - #admin                → admin ledger
-  //  - ?checkout_id=chk_...   → payment confirmation (return from Bachs)
+  //  - #admin                       → admin ledger
+  //  - ?checkout_id=…                → payment confirmation (return from Bachs)
+  //  - ?checkout=cancelled           → buyer cancelled; back to landing
+  //  - localStorage pending checkout → fallback confirmation if Bachs didn't
+  //                                    append ?checkout_id on the success URL
   useEffect(() => {
+    const readPending = (): string => {
+      try {
+        const raw = localStorage.getItem("tmon_pending_checkout");
+        if (!raw) return "";
+        const { checkoutId: id, ts } = JSON.parse(raw);
+        // Only treat a recent (<30 min) pending checkout as a return.
+        if (id && Date.now() - ts < 30 * 60 * 1000) return id;
+      } catch {}
+      return "";
+    };
+
     const resolveRoute = () => {
       const params = new URLSearchParams(window.location.search);
       const cid = params.get("checkout_id");
+      const cancelled = params.get("checkout") === "cancelled";
 
       if (window.location.hash === "#admin") {
         setView("admin");
         setIsAdmin(true);
         return;
       }
-      if (cid) {
-        setCheckoutId(cid);
+      if (cancelled) {
+        try { localStorage.removeItem("tmon_pending_checkout"); } catch {}
+        window.history.replaceState({}, "", window.location.pathname);
+        setView("landing");
+        return;
+      }
+      const pending = cid || readPending();
+      if (pending) {
+        try { localStorage.removeItem("tmon_pending_checkout"); } catch {}
+        setCheckoutId(pending);
         setView("confirm");
         return;
       }

@@ -46,6 +46,14 @@ export default function CheckoutForm({ quantity }: CheckoutFormProps) {
       }
       const url = payload?.checkoutUrl;
       if (!url) throw new Error("No checkout URL returned.");
+      // Remember this checkout so the confirmation page can find it on return,
+      // even if Bachs doesn't append ?checkout_id to the success URL.
+      try {
+        localStorage.setItem(
+          "tmon_pending_checkout",
+          JSON.stringify({ checkoutId: payload.checkoutId, ts: Date.now() })
+        );
+      } catch {}
       // Hand off to the Bachs hosted checkout page.
       window.location.href = url;
     } catch (err: any) {
