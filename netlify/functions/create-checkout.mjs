@@ -57,7 +57,7 @@ export const handler = async (event) => {
   });
 
   const base = process.env.BACHS_BASE_URL || "https://sandbox-api.bachs.io";
-  const appUrl = process.env.APP_BASE_URL || "";
+  const appUrl = (process.env.APP_BASE_URL || "").replace(/\/+$/, ""); // strip trailing slash
 
   let res;
   try {
