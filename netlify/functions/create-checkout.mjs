@@ -85,7 +85,11 @@ export const handler = async (event) => {
   const text = await res.text();
   if (!res.ok) {
     console.error("Bachs checkout error:", res.status, text);
-    return json(502, { error: "Failed to create the checkout session." });
+    // TEMP DEBUG: surface Bachs' error so we can diagnose sandbox setup.
+    return json(502, {
+      error: "Failed to create the checkout session.",
+      debug: { status: res.status, body: text.slice(0, 600) },
+    });
   }
 
   let session;
